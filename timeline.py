@@ -12,6 +12,7 @@ class TimelineActivity:
         self.drag_offset_x = 0
         self.drag_offset_y = 0
         self.has_conflict = False
+        self.marked_for_delete = False
 
     def update_position(self, x, y):
         self.rect.x = x

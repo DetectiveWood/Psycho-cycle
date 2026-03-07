@@ -493,17 +493,24 @@ class VisualDayPlanningGame:
                                 'warning')
 
     def handle_mouse_down(self, mouse_pos):
-        """Handle mouse button down"""
         if self.game_state.phase != 'planning':
             return
 
-        # Check if clicking on timeline activity
+        # Клик по размещённой активности
         timeline_activity = self.game_state.get_timeline_activity_at_position(mouse_pos[0], mouse_pos[1])
         if timeline_activity:
             self.game_state.dragging_activity = timeline_activity
             timeline_activity.dragging = True
             timeline_activity.drag_offset_x = mouse_pos[0] - timeline_activity.rect.x
             timeline_activity.drag_offset_y = mouse_pos[1] - timeline_activity.rect.y
+
+            # ← СОХРАНЯЕМ СТАРЫЕ ДАННЫЕ ДЛЯ ВОЗВРАТА
+            timeline_activity._old_start_time = timeline_activity.start_time
+            timeline_activity._old_rect_x = timeline_activity.rect.x
+            timeline_activity._old_rect_width = timeline_activity.rect.width
+            # В начале драга (в handle_mouse_down)
+            timeline_activity._old_rect_y = timeline_activity.rect.y
+            timeline_activity._old_rect_height = timeline_activity.rect.height
             return
 
         # Check if clicking on available activity to drag to timeline (no selection required)
@@ -542,87 +549,80 @@ class VisualDayPlanningGame:
                     temp_activity.drag_offset_y = 20
                     self.game_state.dragging_activity = temp_activity
 
+    # In handle_mouse_up - pass existing_activity when transferring
     def handle_mouse_up(self, mouse_pos):
-        """Handle mouse button up"""
         if not self.game_state.dragging_activity:
             return
 
-        dragging_activity = self.game_state.dragging_activity
+        dragged = self.game_state.dragging_activity
+        rect = self.game_state.timeline_rect
+        mx, my = mouse_pos
 
-        # Check if dropping on timeline
-        if self.game_state.timeline_rect.collidepoint(mouse_pos):
-            # Calculate precise drop time based on mouse position
-            drop_time = self.game_state.get_hour_from_x_position(mouse_pos[0])
+        if not rect.collidepoint(mx, my):
+            # Удаление
+            if dragged in self.game_state.timeline_activities:
+                self.game_state.timeline_activities.remove(dragged)
+                self.game_state.add_message(f"Активность '{dragged.activity['name']}' удалена", 'warning')
+        else:
+            drop_time = self.game_state.get_hour_from_x_position(mx)
 
-            if dragging_activity in self.game_state.timeline_activities:
-                # Moving existing activity
-                old_start = dragging_activity.start_time
-                old_end = dragging_activity.end_time
+            # При переносе существующей активности — игнорируем её саму при проверке
+            is_existing = dragged in self.game_state.timeline_activities
+            can_place = self.game_state.can_place_activity_at_time(
+                dragged.activity,
+                drop_time,
+                ignore_activity=dragged if is_existing else None
+            )
 
-                # Temporarily remove from timeline for conflict checking
-                self.game_state.timeline_activities.remove(dragging_activity)
+            if can_place:
+                # Успешное размещение
+                dragged.start_time = drop_time
+                dragged.end_time = drop_time + dragged.activity['duration']
+                dragged.rect.x = self.game_state.get_hour_x_position(drop_time)
+                dragged.rect.width = self.game_state.get_hour_x_position(
+                    drop_time + dragged.activity['duration']) - dragged.rect.x
+                dragged.rect.y = rect.y + 60  # фиксированная строка
+                dragged.rect.height = 50
 
-                # Check if activity can be placed normally or with special card ability
-                can_place_normally = self.game_state.can_place_activity_at_time(dragging_activity.activity, drop_time)
-                can_place_with_card = (hasattr(self.game_state, 'activity_move_uses') and
-                                       self.game_state.activity_move_uses > 0)
+                # Сбрасываем флаг конфликта
+                dragged.has_conflict = False
 
-                if can_place_normally or can_place_with_card:
-                    # Update position to exact drop location
-                    dragging_activity.start_time = drop_time
-                    dragging_activity.end_time = drop_time + dragging_activity.activity['duration']
+                # Если новая — добавляем
+                if not is_existing:
+                    self.game_state.timeline_activities.append(dragged)
 
-                    # Update visual position with precise grid alignment
-                    x = self.game_state.get_hour_x_position(dragging_activity.start_time)
-                    width = self.game_state.get_hour_x_position(dragging_activity.end_time) - x
-                    dragging_activity.rect.x = x
-                    dragging_activity.rect.y = self.game_state.timeline_rect.y + 60
-                    dragging_activity.rect.width = width
-                    dragging_activity.rect.height = 50
-
-                    # ВАЖНО: Добавляем обратно в список ДО вызова format_time_display
-                    self.game_state.timeline_activities.append(dragging_activity)
-
-                    # Use card ability if needed
-                    if not can_place_normally and can_place_with_card:
-                        self.game_state.activity_move_uses -= 1
-                        message_suffix = " (использована карта времени)"
-                    else:
-                        message_suffix = ""
-
-                    # More informative message showing exact time placement
-                    start_str = self.format_time_display(drop_time)
-                    end_str = self.format_time_display(dragging_activity.end_time)
-                    self.game_state.add_message(
-                        f"Перемещено: {dragging_activity.activity['name']} ({start_str}-{end_str}){message_suffix}",
-                        'success')
-                else:
-                    # Restore original position
-                    dragging_activity.start_time = old_start
-                    dragging_activity.end_time = old_end
-                    x = self.game_state.get_hour_x_position(old_start)
-                    width = self.game_state.get_hour_x_position(old_end) - x
-                    dragging_activity.rect.x = x
-                    dragging_activity.rect.width = width
-                    dragging_activity.rect.height = 50  # Восстанавливаем высоту тоже
-                    self.game_state.timeline_activities.append(dragging_activity)
-                    self.game_state.add_message("Нельзя переместить сюда!", 'danger')
+                self.game_state.add_message(f"Размещено на {drop_time:.1f}", 'success')
             else:
-                # Adding new activity from available list to exact drop location
-                self.game_state.place_activity_on_timeline(dragging_activity.activity, drop_time)
+                # Конфликт — возврат на старое место
+                if is_existing:
+                    dragged.start_time = dragged._old_start_time
+                    dragged.end_time = dragged._old_start_time + dragged.activity['duration']
+                    dragged.rect.x = dragged._old_rect_x
+                    dragged.rect.width = dragged._old_rect_width
+                    dragged.rect.y = rect.y + 60
+                    dragged.rect.height = 50
 
-        # Reset dragging state
-        if dragging_activity:
-            dragging_activity.dragging = False
+                self.game_state.add_message("Нельзя разместить — конфликт или ограничение", 'danger')
+
+        # Завершаем перетаскивание
+        dragged.dragging = False
+        dragged.marked_for_delete = False
         self.game_state.dragging_activity = None
-        self.game_state.update_timeline_conflicts()
 
     def handle_mouse_motion(self, mouse_pos):
-        """Handle mouse motion"""
+        """Обновление позиции перетаскиваемой активности + намёк на удаление"""
         if self.game_state.dragging_activity:
             activity = self.game_state.dragging_activity
+            self.game_state.dragging_activity
+            # Обновляем позицию
             activity.rect.x = mouse_pos[0] - activity.drag_offset_x
             activity.rect.y = mouse_pos[1] - activity.drag_offset_y
+
+            # Визуальный намёк: если курсор за пределами таймлайна — помечаем для удаления
+            if not self.game_state.timeline_rect.collidepoint(mouse_pos):
+                activity.marked_for_delete = True
+            else:
+                activity.marked_for_delete = False
 
     def handle_right_click(self, mouse_pos):
         """Handle right mouse click"""
@@ -1914,7 +1914,7 @@ class VisualDayPlanningGame:
             },
             'Незнакомка следит': {
                 'status_id': 'surveillance_paranoia',
-                'name': 'Паранойя слежки',
+                'name': 'Глаза повсюду',
                 'icon': '🕵️',
                 'description': 'Постоянное чувство наблюдения. Социальные активности вызывают +50% стресса',
                 'duration': 6.0,
@@ -1922,7 +1922,7 @@ class VisualDayPlanningGame:
             },
             'Странная тень': {
                 'status_id': 'shadow_paranoia',
-                'name': 'Теневая паранойя',
+                'name': 'Тени',
                 'icon': '👥',
                 'description': 'Мерещатся тени в периферическом зрении. Все негативные события на 30% сильнее',
                 'duration': 6.0,
@@ -2030,20 +2030,19 @@ class VisualDayPlanningGame:
 
         # Improve relationship slightly (with doubt effect if applicable)
         relationship_change = self.apply_doubt_effects_to_voice_relationship(5)
-        self.game_state.inner_voice_relationship = min(100,
-                                                       self.game_state.inner_voice_relationship + relationship_change)
+        self.game_state.inner_voice_relationship = min(100, self.game_state.inner_voice_relationship + relationship_change)
 
         # Random outcome (50/50 chance)
         if random.random() < 0.5:
             # Good outcome: stress relief but slight paranoia
-            self.game_state.stress = max(0, self.game_state.stress - 10)
-            self.game_state.paranoia = min(100, self.game_state.paranoia + 5)
+            self.game_state.stress = max(0, self.game_state.stress - 18)
+            self.game_state.paranoia = min(100, self.game_state.paranoia + 9)
             effect = "голос успокоил вас, но какое-то странное чувство осталось..."
             message_type = 'warning'
         else:
             # Bad outcome: disturbing truth
-            self.game_state.paranoia = min(100, self.game_state.paranoia + 10)
-            self.game_state.stress = min(100, self.game_state.stress + 5)
+            self.game_state.paranoia = min(100, self.game_state.paranoia + 5)
+            self.game_state.stress = min(100, self.game_state.stress + 8)
             effect = "голос открыл вам страшную правду, вы были не готовы"
             message_type = 'danger'
 
@@ -2075,7 +2074,7 @@ class VisualDayPlanningGame:
         self.game_state.daily_voice_interactions += 1
 
         # Significantly worsen relationship
-        self.game_state.inner_voice_relationship = max(-100, self.game_state.inner_voice_relationship - 8)
+        self.game_state.inner_voice_relationship = max(-100, self.game_state.inner_voice_relationship - 10)
 
         # Random outcome (50/50 chance)
         if random.random() < 0.5:
@@ -2087,8 +2086,8 @@ class VisualDayPlanningGame:
             message_type = 'warning'
         else:
             # Bad outcome: obsessive thoughts
-            self.game_state.stress = min(100, self.game_state.stress + 12)
-            self.game_state.paranoia = min(100, self.game_state.paranoia + 10)
+            self.game_state.stress = min(100, self.game_state.stress + 5)
+            self.game_state.paranoia = min(100, self.game_state.paranoia + 5)
             effect = "теперь назойливые мысли не покидают вас и вы прокручиваете этот спор из раза в раз"
             message_type = 'danger'
 
@@ -2176,9 +2175,14 @@ class VisualDayPlanningGame:
             if not hasattr(self.game_state, 'completed_voice_tasks'):
                 self.game_state.completed_voice_tasks = []
 
+            # Сначала собираем все бонусы и штрафы отдельно
+            total_bonus = 0
+            total_penalty = 0
+            completed_count = 0
+            failed_count = 0
+
             for task in self.game_state.voice_tasks:
                 if task['id'] not in self.game_state.completed_voice_tasks:
-                    # For tasks that require task context, pass the task itself to the check function
                     task_completed = False
                     try:
                         if task['id'].startswith('specific_time_') or task['id'].startswith('avoid_'):
@@ -2186,66 +2190,87 @@ class VisualDayPlanningGame:
                         else:
                             task_completed = task['check'](self.game_state)
                     except TypeError:
-                        # Fallback for tasks that don't expect task parameter
                         task_completed = task['check'](self.game_state)
 
                     if task_completed:
-                        # Task completed automatically!
+                        # Выполнено
+                        completed_count += 1
                         self.game_state.completed_voice_tasks.append(task['id'])
                         task_statistics['completed_tasks'].append(task)
 
-                        # Give rewards
                         reward = task['reward']
                         card_points_reward = reward.get('card_points', 0)
                         relationship_reward = reward.get('voice_relationship', 0)
 
-                        # Apply doubt effects to relationship reward
                         effective_relationship_reward = self.apply_doubt_effects_to_voice_relationship(
                             relationship_reward)
 
+                        total_bonus += effective_relationship_reward
                         self.game_state.card_points += card_points_reward
-                        self.game_state.inner_voice_relationship += effective_relationship_reward
 
-                        # Track for statistics
                         task_statistics['total_card_points_earned'] += card_points_reward
                         task_statistics['total_relationship_gained'] += effective_relationship_reward
 
                         self.game_state.add_message(
-                            f"🎯 Задание выполнено: {task['name']} (+{card_points_reward} очков карт, +{effective_relationship_reward} отношений)",
+                            f"🎯 Задание выполнено: {task['name']} (+{card_points_reward} карт, +{effective_relationship_reward} отношений)",
                             'success')
-                        self.game_state.voice_history.append(f"Выполнили задание: {task['name']}")
+                        self.game_state.voice_history.append(f"Выполнили: {task['name']}")
                     else:
-                        # Task failed - apply penalties
+                        # Провалено
+                        failed_count += 1
                         task_statistics['failed_tasks'].append(task)
 
-            # Apply penalties for failed tasks
-            for failed_task in task_statistics['failed_tasks']:
-                reward = failed_task['reward']
+                        reward = task['reward']
+                        relationship_penalty = -abs(reward.get('voice_relationship', 5))
+                        paranoia_penalty = max(1, abs(reward.get('card_points', 1)) * 1)
 
-                # 🚨 ИСПРАВЛЕНИЕ: Penalty is proportional to the reward - ПАРАНОЙЯ вместо стресса
-                relationship_penalty = -abs(reward.get('voice_relationship', 5))
-                # Меньшее наказание паранойей вместо стресса (1-3 паранойи вместо 3-6 стресса)
-                paranoia_penalty = max(1, abs(reward.get('card_points', 1)) * 1)  # 1-3 paranoia per failed task
+                        effective_paranoia_penalty = self.apply_doubt_effects_to_voice_paranoia(paranoia_penalty)
+                        effective_relationship_penalty = self.apply_doubt_effects_to_voice_relationship(
+                            relationship_penalty)
 
-                # Apply doubt effects to voice-related paranoia and relationship penalties
-                effective_paranoia_penalty = self.apply_doubt_effects_to_voice_paranoia(paranoia_penalty)
-                effective_relationship_penalty = self.apply_doubt_effects_to_voice_relationship(relationship_penalty)
+                        total_penalty += effective_relationship_penalty
 
-                self.game_state.inner_voice_relationship = max(-100,
-                                                               self.game_state.inner_voice_relationship + effective_relationship_penalty)
-                self.game_state.paranoia = min(100, self.game_state.paranoia + effective_paranoia_penalty)
+                        task_statistics['total_relationship_lost'] += abs(effective_relationship_penalty)
+                        if 'total_paranoia_penalty' not in task_statistics:
+                            task_statistics['total_paranoia_penalty'] = 0
+                        task_statistics['total_paranoia_penalty'] += effective_paranoia_penalty
 
-                # Track for statistics
-                task_statistics['total_relationship_lost'] += abs(effective_relationship_penalty)
-                # Переименовываем статистику
-                if 'total_paranoia_penalty' not in task_statistics:
-                    task_statistics['total_paranoia_penalty'] = 0
-                task_statistics['total_paranoia_penalty'] += effective_paranoia_penalty
+                        self.game_state.add_message(
+                            f"❌ Задание провалено: {task['name']} ({effective_relationship_penalty} отношений, +{effective_paranoia_penalty} паранойи)",
+                            'danger')
+                        self.game_state.voice_history.append(f"Провалили: {task['name']}")
 
-                self.game_state.add_message(
-                    f"❌ Задание провалено: {failed_task['name']} ({effective_relationship_penalty} отношений, +{effective_paranoia_penalty} паранойи)",
-                    'danger')
-                self.game_state.voice_history.append(f"Провалили задание: {failed_task['name']}")
+            # ────────────────────────────────────────────────
+            # Применяем изменения в нужном порядке
+            # ────────────────────────────────────────────────
+
+            # 1. Сначала штрафы (дебаффы)
+            self.game_state.inner_voice_relationship += max(self.game_state.inner_voice_relationship + total_bonus, -100)
+
+            # 2. Потом бонусы (баффы)
+            self.game_state.inner_voice_relationship = min(self.game_state.inner_voice_relationship + total_bonus, 100)
+
+            # 3. Применяем паранойю от провалов (она не зависит от порядка)
+            self.game_state.paranoia = min(100,
+                                           self.game_state.paranoia + task_statistics.get('total_paranoia_penalty', 0))
+
+            # ────────────────────────────────────────────────
+            # Итоговое сообщение
+            # ────────────────────────────────────────────────
+
+            net_change = total_bonus + total_penalty
+            msg = f"Голос: {completed_count}/{len(self.game_state.voice_tasks)} заданий выполнено. "
+            if net_change > 0:
+                msg += f"Итог: +{net_change} отношений"
+                msg_type = 'success'
+            elif net_change < 0:
+                msg += f"Итог: {net_change} отношений"
+                msg_type = 'danger'
+            else:
+                msg += "Отношения не изменились"
+                msg_type = 'info'
+
+            self.game_state.add_message(msg, msg_type)
 
         # Calculate day completion bonus (only if voice system is unlocked - день 3+)
         if self.game_state.day >= 3:
@@ -2257,6 +2282,7 @@ class VisualDayPlanningGame:
                 self.game_state.add_message("Бонус за низкий стресс: +1 очко", 'success')
 
             if self.game_state.energy > 50:
+                completion_bonus += 1
                 if self.game_state.energy > 70:
                     completion_bonus += 1
                     self.game_state.add_message("Бонус за отличную энергию: +1 очко", 'success')
@@ -2674,7 +2700,7 @@ class VisualDayPlanningGame:
                         'Закатное солнце золотит улицы. Город живёт своей жизнью. Вы часть этого.',
                         'Вечерний город шумит и светится. Вы идёте не спеша. Всё как обычно.'
                     ],
-                    'effects': {'stress': -2},
+                    'effects': {'stress': -5},
                     'hint': 'Иногда обычное - это тоже хорошо.'
                 },
                 {
@@ -2696,7 +2722,7 @@ class VisualDayPlanningGame:
                         'Приятный разговор за чашкой кофе. Смех, понимание. Это важно.',
                         'Вы делитесь мыслями с другом. Диалог лёгкий и искренний. Вас слышат.'
                     ],
-                    'effects': {'stress': -3, 'paranoia': -2},
+                    'effects': {'stress': -7, 'paranoia': -5},
                     'hint': 'Общение - лучшее лекарство от одиночества.'
                 }
             ],
@@ -2711,7 +2737,7 @@ class VisualDayPlanningGame:
                         'Шаги за спиной всё ближе. Вы бежите изо всех сил. Но не можете убежать...',
                         'Погоня не прекращается. Силы на исходе. Преследователь настигает...'
                     ],
-                    'effects': {'stress': 5},
+                    'effects': {'stress': 8},
                     'hint': 'Иногда лучше остановиться и разобраться в причинах страха.'
                 },
                 {
@@ -2729,11 +2755,11 @@ class VisualDayPlanningGame:
                     'id': 'dark_fall',
                     'name': 'Падение',
                     'descriptions': [
-                        'Вы падаете в бездну. Падение кажется бесконечным. Нет контроля...',
+                        'Вы падаете в бездну. Падение кажется бесконечным. Даже солнечного света уже нет...',
                         'Земля уходит из-под ног. Вы летите вниз. Не за что ухватиться...',
                         'Свободное падение в темноту. Ветер свистит. Конца не видно...'
                     ],
-                    'effects': {'stress': 6, 'paranoia': 3},
+                    'effects': {'stress': 6, 'paranoia': 9},
                     'hint': 'Потеря контроля начинается с маленьких вещей.'
                 }
             ],
@@ -2748,8 +2774,8 @@ class VisualDayPlanningGame:
                         'Тени наблюдают за вами. Вы чувствуете их присутствие. Всегда. Везде.',
                         'Невидимые глаза следят за каждым вашим движением. Нет покоя.'
                     ],
-                    'effects': {'paranoia': 5, 'stress': 3},
-                    'hint': 'Не все смотрят на вас. Большинство занято собой.'
+                    'effects': {'paranoia': 10, 'stress': 8},
+                    'hint': 'Не все смотрят на вас. Большинство заняты собой.'
                 },
                 {
                     'id': 'nightmare_conspiracy',
@@ -2759,7 +2785,7 @@ class VisualDayPlanningGame:
                         'Знаки повсюду. Совпадений слишком много. Это не случайно. Заговор...',
                         'Все они часть плана. Против вас. Вы видите паутину интриг. Ловушка...'
                     ],
-                    'effects': {'paranoia': 8, 'stress': 5},
+                    'effects': {'paranoia': 12, 'stress': 5},
                     'hint': 'Совпадения - это часто просто совпадения.'
                 },
                 {
@@ -2835,7 +2861,7 @@ class VisualDayPlanningGame:
                     'descriptions': [
                         'Спортзал давит на вас. Тренажёры выглядят как орудия пыток. Воздух тяжёл...',
                         'В зале слишком много людей. Они все смотрят. Вы чувствуете слабость...',
-                        'Вы пытаетесь тренироваться, но тело не слушается. Насмешки вокруг...'
+                        'Вы пытаетесь тренироваться, но тело не слушается. Слыщны насмешки...'
                     ],
                     'effects': {'stress': 4, 'energy': -3},
                     'hint': 'Физические нагрузки могут быть опасны сегодня...',
@@ -2942,7 +2968,7 @@ class VisualDayPlanningGame:
             return 'lucid'
 
         # 10% шанс предупреждающего сна
-        if rand < 0.15:
+        if rand < 0.20:
             return 'warning'
 
         # 10% шанс мотивирующего сна
@@ -3223,7 +3249,7 @@ class VisualDayPlanningGame:
                     description_2,
                     description_6,
                     "Однако вы также чувствовали какой-то подвох, но... Никак не могли понять в чем он заключается. "
-                    "Потом до dfc начало доходить. Котик больше не появлялся, а дела становились все хуже и хуже. ",
+                    "Потом до вас начало доходить. Котик больше не появлялся, а дела становились все хуже и хуже. ",
                     "Идеал опять недостижимо далеко, остается только... "
                 ],
                 'stats': {
@@ -3518,126 +3544,117 @@ class VisualDayPlanningGame:
                 self.screen.blit(down_surface, (960, 345))
 
     def draw_timeline(self):
-        """Draw the timeline and placed activities with visual grid cells"""
-        # Timeline background
-        pygame.draw.rect(self.screen, COLORS['timeline_bg'], self.game_state.timeline_rect)
-        pygame.draw.rect(self.screen, COLORS['accent'], self.game_state.timeline_rect, 2)
+        """Отрисовка временной шкалы дня с сеткой, метками и активностями"""
+        rect = self.game_state.timeline_rect
 
-        # Title
-        title_surface = FONTS['medium'].render("Временная шкала дня", True, COLORS['text'])
-        self.screen.blit(title_surface, (30, self.game_state.timeline_rect.y + 10))
+        # Фон и рамка
+        pygame.draw.rect(self.screen, COLORS['timeline_bg'], rect)
+        pygame.draw.rect(self.screen, COLORS['accent'], rect, 2)
 
-        # Instructions
-        instruction1 = "Перетаскивайте активности сюда • ПКМ - удалить"
-        instruction1_surface = FONTS['small'].render(instruction1, True, COLORS['text_dim'])
-        self.screen.blit(instruction1_surface, (30, self.game_state.timeline_rect.y + 30))
+        # Заголовок и инструкция
+        title_surf = FONTS['medium'].render("Временная шкала дня", True, COLORS['text'])
+        self.screen.blit(title_surf, (30, rect.y + 10))
 
-        # Calculate grid parameters
-        hours_y = self.game_state.timeline_rect.y + 50
-        activity_area_top = self.game_state.timeline_rect.y + 60
-        activity_area_height = 50
+        instr = "Перетаскивайте сюда • Отпустите за пределами — удалить"
+        instr_surf = FONTS['small'].render(instr, True, COLORS['text_dim'])
+        self.screen.blit(instr_surf, (30, rect.y + 30))
 
-        # Draw time cell backgrounds to show drop zones
+        # Параметры зоны активностей — ВЫНОСИМ НАРУЖУ, чтобы были видны везде
+        hours_y = rect.y + 50
+        activity_area_top = rect.y + 60  # ← здесь объявляем
+        activity_area_height = 50  # ← здесь объявляем
+
+        # Рисуем фоновые ячейки сетки (30-минутные слоты)
         current_time = self.game_state.timeline_start_hour
         while current_time < self.game_state.timeline_end_hour:
             x_start = self.game_state.get_hour_x_position(current_time)
             x_end = self.game_state.get_hour_x_position(current_time + 0.5)
 
-            # Create subtle grid cells
             cell_rect = pygame.Rect(x_start, activity_area_top, x_end - x_start, activity_area_height)
 
-            # Alternate cell colors for better visibility
-            is_even_hour = int(current_time) % 2 == 0
-            is_full_hour = current_time == int(current_time)
+            is_even = int(current_time) % 2 == 0
+            is_full = current_time == int(current_time)
 
-            if is_even_hour and is_full_hour:
-                cell_color = (45, 45, 70)  # Slightly lighter
-            elif is_even_hour:
-                cell_color = (40, 40, 65)  # Medium
-            elif is_full_hour:
-                cell_color = (35, 35, 60)  # Medium-dark
-            else:
-                cell_color = (30, 30, 55)  # Darkest
+            cell_color = (45, 45, 70) if is_even and is_full else \
+                (40, 40, 65) if is_even else \
+                    (35, 35, 60) if is_full else (30, 30, 55)
 
             pygame.draw.rect(self.screen, cell_color, cell_rect)
             pygame.draw.rect(self.screen, COLORS['timeline_hour'], cell_rect, 1)
 
             current_time += 0.5
 
-        # Draw hour markers and half-hour markers
+        # Метки часов и получасов
         current_time = self.game_state.timeline_start_hour
         while current_time <= self.game_state.timeline_end_hour:
             x = self.game_state.get_hour_x_position(current_time)
+            is_full = current_time == int(current_time)
+            is_major = is_full and int(current_time) % 2 == 0
 
-            # Determine if this is a full hour or half hour
-            is_full_hour = current_time == int(current_time)
-            is_major_hour = is_full_hour and int(current_time) % 2 == 0
-
-            # Line style based on time type
-            if is_major_hour:
-                line_color = COLORS['accent']
-                line_width = 2
-            elif is_full_hour:
-                line_color = COLORS['timeline_hour']
-                line_width = 1
-            else:
-                line_color = COLORS['timeline_hour']
-                line_width = 1
+            line_width = 2 if is_major else 1
+            line_color = COLORS['accent'] if is_major else COLORS['timeline_hour']
 
             pygame.draw.line(self.screen, line_color,
-                             (x, hours_y), (x, self.game_state.timeline_rect.bottom - 20), line_width)
+                             (x, hours_y),
+                             (x, rect.bottom - 20),
+                             line_width)
 
-            # Label logic
-            if is_full_hour:
-                hour_label = f"{int(current_time)}:00"
-                label_color = COLORS['text'] if is_major_hour else COLORS['text_dim']
-                hour_surface = FONTS['tiny'].render(hour_label, True, label_color)
-                label_rect = hour_surface.get_rect()
-                label_rect.centerx = x
-                label_rect.y = self.game_state.timeline_rect.bottom - 15
-                self.screen.blit(hour_surface, label_rect)
-            else:
-                # Half-hour mark - no labels, just visual indicators
-                pass
+            if is_full:
+                label = f"{int(current_time)}:00"
+                label_color = COLORS['text'] if is_major else COLORS['text_dim']
+                surf = FONTS['tiny'].render(label, True, label_color)
+                self.screen.blit(surf, (x - surf.get_width() // 2, rect.bottom - 15))
 
             current_time += 0.5
 
-        # Highlight drop zone when dragging
+        # Подсветка зоны дропа при перетаскивании
         if self.game_state.dragging_activity:
-            mouse_pos = pygame.mouse.get_pos()
-            if self.game_state.timeline_rect.collidepoint(mouse_pos):
-                drop_time = self.game_state.get_hour_from_x_position(mouse_pos[0])
-                duration = self.game_state.dragging_activity.activity['duration']
+            mx, my = pygame.mouse.get_pos()
+            if rect.collidepoint(mx, my):
+                drop_time = self.game_state.get_hour_from_x_position(mx)
+                dur = self.game_state.dragging_activity.activity['duration']
 
-                # Highlight the cells where the activity would be placed
-                highlight_start = self.game_state.get_hour_x_position(drop_time)
-                highlight_end = self.game_state.get_hour_x_position(drop_time + duration)
-                highlight_rect = pygame.Rect(highlight_start, activity_area_top,
-                                             highlight_end - highlight_start, activity_area_height)
+                x1 = self.game_state.get_hour_x_position(drop_time)
+                x2 = self.game_state.get_hour_x_position(drop_time + dur)
+                hl_rect = pygame.Rect(x1, activity_area_top, x2 - x1, activity_area_height)
 
-                # Check if placement is valid
+                # Проверка возможности размещения (с игнорированием себя, если перенос)
+                is_existing = self.game_state.dragging_activity in self.game_state.timeline_activities
                 can_place = self.game_state.can_place_activity_at_time(
-                    self.game_state.dragging_activity.activity, drop_time)
+                    self.game_state.dragging_activity.activity,
+                    drop_time,
+                    ignore_activity=self.game_state.dragging_activity if is_existing else None
+                )
 
-                highlight_color = (80, 120, 80, 100) if can_place else (120, 80, 80, 100)
-                highlight_surface = pygame.Surface((highlight_rect.width, highlight_rect.height))
-                highlight_surface.set_alpha(100)
-                highlight_surface.fill(highlight_color[:3])
-                self.screen.blit(highlight_surface, highlight_rect)
+                color = (80, 120, 80, 100) if can_place else (120, 80, 80, 100)
+                surf = pygame.Surface(hl_rect.size, pygame.SRCALPHA)
+                surf.fill(color)
+                self.screen.blit(surf, hl_rect.topleft)
 
-                # Draw border
-                border_color = COLORS['success'] if can_place else COLORS['danger']
-                pygame.draw.rect(self.screen, border_color, highlight_rect, 3)
+                border = COLORS['success'] if can_place else COLORS['danger']
+                pygame.draw.rect(self.screen, border, hl_rect, 3)
 
-        # Draw placed activities
-        for timeline_activity in self.game_state.timeline_activities:
-            self.draw_timeline_activity(timeline_activity)
+            # Намёк на удаление (если курсор за пределами)
+            else:
+                dragged = self.game_state.dragging_activity
+                s = pygame.Surface(dragged.rect.size, pygame.SRCALPHA)
+                s.fill((255, 80, 80, 140))
+                self.screen.blit(s, dragged.rect.topleft)
 
-        # Draw dragging activity
+                trash = FONTS['medium'].render("🗑️", True, (255, 255, 255))
+                self.screen.blit(trash, (dragged.rect.centerx - 20, dragged.rect.centery - 20))
+
+        # Размещённые активности
+        for ta in self.game_state.timeline_activities:
+            self.draw_timeline_activity(ta)
+
+        # Перетаскиваемая активность (если ещё не отпущена)
         if self.game_state.dragging_activity and self.game_state.dragging_activity not in self.game_state.timeline_activities:
             self.draw_timeline_activity(self.game_state.dragging_activity)
-        x = self.game_state.get_hour_x_position(self.game_state.current_time)
-        TimelineActivity.draw_current_time_arrow(self.screen, self.game_state.timeline_rect, x)
+
+        # Стрелка текущего времени — поверх всего
+        current_x = self.game_state.get_hour_x_position(self.game_state.current_time)
+        TimelineActivity.draw_current_time_arrow(self.screen, rect, current_x)
 
     def draw_prediction_panel(self):
         """Draw prediction panel showing upcoming events"""

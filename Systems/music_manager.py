@@ -118,47 +118,6 @@ class MusicManager:
 
         return ending_tracks
 
-    def load_ending_music_duplicate(self):
-        """DEPRECATED: Duplicate function - should be removed"""
-        import os
-        import glob
-
-        ending_tracks = {
-            'good': None,  # music/end/1.*
-            'neutral': None,  # music/end/2.*
-            'bad': None,  # music/end/3.*
-            'perfect': None,  # music/end/4.*
-            'breakthrough': None,  # music/end/5.*
-            'control': None  # music/end/6.*
-        }
-
-        # Supported audio formats
-        audio_extensions = ['*.ogg', '*.wav', '*.mp3', '*.flac', '*.aac']
-
-        end_dir = 'music/end'
-
-        if os.path.exists(end_dir) and os.path.isdir(end_dir):
-            # Look for specific numbered tracks
-            track_mappings = {
-                'good': '1',
-                'neutral': '2',
-                'bad': '3',
-                'perfect': '4',
-                'breakthrough': '5',
-                'control': '6'
-            }
-
-            for ending_type, track_number in track_mappings.items():
-                for extension in audio_extensions:
-                    pattern = os.path.join(end_dir, f"{track_number}.*")
-                    files = glob.glob(pattern)
-                    if files:
-                        # Take the first matching file
-                        ending_tracks[ending_type] = files[0]
-                        break
-
-        return ending_tracks
-
     def load_whisper_sounds(self):
         """Load whisper sound effects for paranoia system"""
         import os

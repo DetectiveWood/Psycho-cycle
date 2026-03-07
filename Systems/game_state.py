@@ -388,26 +388,26 @@ class GameState:
                 'effect': {'energy': 17, 'stress': -13},
                 'unlock_day': 1
             },
-            {
-                'id': 'healthy_snack',
-                'name': 'Здоровый перекус',
-                'icon': '🥗',
-                'description': 'Постепенно восстанавливает энергию',
-                'cost': 14,
-                'rarity': 'common',
-                'effect_type': 'immediate',
-                'effect': {'energy': 20},
-                'unlock_day': 1
-            },
+            ##{
+                ##'id': 'healthy_snack',
+                ##'name': 'Здоровый перекус',
+                ##'icon': '🥗',
+                ##'description': 'Постепенно восстанавливает энергию',
+                ##'cost': 14,
+                ##'rarity': 'common',
+                ##'effect_type': 'immediate',
+                ##'effect': {'energy': 20},
+                ##'unlock_day': 1
+            ##},
             {
                 'id': 'panic_control',
                 'name': 'Контроль паники',
                 'icon': '🆘',
                 'description': 'Экстренное снижение стресса',
-                'cost': 20,
+                'cost': 23,
                 'rarity': 'uncommon',
                 'effect_type': 'immediate',
-                'effect': {'stress': -40},
+                'effect': {'stress': -65},
                 'unlock_day': 3
             },
 
@@ -450,7 +450,7 @@ class GameState:
                 'name': 'Оберег от паранойи',
                 'icon': '👁️‍🗨️',
                 'description': 'Предотвращает рост паранойи',
-                'cost': 15,
+                'cost': 16,
                 'rarity': 'uncommon',
                 'effect_type': 'day_buff',
                 'effect': {'paranoia_immunity': True},
@@ -471,7 +471,7 @@ class GameState:
                 'id': 'emergency_kit',
                 'name': 'Аварийный набор',
                 'icon': '🎒',
-                'description': 'Защищает от любого одного события',
+                'description': 'Защищает от одного любого негативного события',
                 'cost': 7,
                 'rarity': 'rare',
                 'effect_type': 'one_time_protection',
@@ -530,7 +530,7 @@ class GameState:
                 'id': 'time_rewind',
                 'name': 'Возврат времени',
                 'icon': '⏪',
-                'description': 'Отменяет последнее событие',
+                'description': 'Отменяет последнее негативное событие',
                 'cost': 17,
                 'rarity': 'legendary',
                 'effect_type': 'event_manipulation',
@@ -553,10 +553,10 @@ class GameState:
                 'name': 'Гармония с голосом',
                 'icon': '🎵',
                 'description': 'Улучшает отношения с внутренним голосом',
-                'cost': 13,
+                'cost': 12,
                 'rarity': 'rare',
                 'effect_type': 'voice_relationship',
-                'effect': {'voice_bonus': 20},
+                'effect': {'voice_bonus': 35},
                 'unlock_day': 8
             },
             {
@@ -586,7 +586,7 @@ class GameState:
                 'name': 'Перетасовка колоды',
                 'icon': '🔀',
                 'description': 'Получить 3 случайные карты',
-                'cost': 24,
+                'cost': 31,
                 'rarity': 'rare',
                 'effect_type': 'card_generation',
                 'effect': {'random_cards': 3},
@@ -643,7 +643,7 @@ class GameState:
                 'name': 'Глубокий релакс',
                 'icon': '🧘‍♀️',
                 'description': 'Снижает стресс на 5 каждый час в течение 10 часов (-50 всего)',
-                'cost': 18,
+                'cost': 14,
                 'rarity': 'uncommon',
                 'effect_type': 'status',
                 'effect': {'status_id': 'deep_relaxation', 'status_name': 'Глубокий релакс', 'status_icon': '🧘‍♀️',
@@ -655,7 +655,7 @@ class GameState:
                 'name': 'Долгая бодрость',
                 'icon': '⚡🔋',
                 'description': 'Восстанавливает 6 энергии каждый час в течение 8 часов (+48 всего)',
-                'cost': 20,
+                'cost': 15,
                 'rarity': 'uncommon',
                 'effect_type': 'status',
                 'effect': {'status_id': 'energy_surge', 'status_name': 'Долгая бодрость', 'status_icon': '⚡🔋',
@@ -667,7 +667,7 @@ class GameState:
                 'name': 'Успокоение умов',
                 'icon': '🧠💫',
                 'description': 'Снижает паранойю на 4 каждый час в течение 12 часов (-48 всего)',
-                'cost': 22,
+                'cost': 14,
                 'rarity': 'uncommon',
                 'effect_type': 'status',
                 'effect': {'status_id': 'mind_calm', 'status_name': 'Успокоение умов', 'status_icon': '🧠💫',
@@ -679,7 +679,7 @@ class GameState:
                 'name': 'Гармоничный баланс',
                 'icon': '☯️',
                 'description': 'Одновременно восстанавливает: -4 стресса, -2 паранойи, +3 энергии в час (6 часов)',
-                'cost': 25,
+                'cost': 16,
                 'rarity': 'rare',
                 'effect_type': 'status',
                 'effect': {'status_id': 'harmony_state', 'status_name': 'Гармоничный баланс', 'status_icon': '☯️',
@@ -692,7 +692,7 @@ class GameState:
                 'name': 'Крепость мира',
                 'icon': '🏰💎',
                 'description': 'Мощная защита: -6 стресса, -3 паранойи каждый час (8 часов)',
-                'cost': 28,
+                'cost': 18,
                 'rarity': 'rare',
                 'effect_type': 'status',
                 'effect': {'status_id': 'peace_fortress', 'status_name': 'Крепость мира', 'status_icon': '🏰💎',
@@ -703,12 +703,12 @@ class GameState:
                 'id': 'total_renewal',
                 'name': 'Полное возрождение',
                 'icon': '✨🌟',
-                'description': 'Легендарная карта: полное восстановление всех ресурсов на час (+30 энергии, -8 стресса, -5 паранойи, повторяется 5 часов)',
-                'cost': 35,
+                'description': 'Полное восстановление всех ресурсов на час (+8 энергии, -8 стресса, -5 паранойи, повторяется 10 часов)',
+                'cost': 24,
                 'rarity': 'legendary',
                 'effect_type': 'status',
                 'effect': {'status_id': 'total_renewal_state', 'status_name': 'Полное возрождение', 'status_icon': '✨🌟',
-                           'duration_hours': 5,
+                           'duration_hours': 10,
                            'effects': {'hourly_energy': 8, 'hourly_stress': -8, 'hourly_paranoia': -5}},
                 'unlock_day': 14
             }
@@ -733,7 +733,7 @@ class GameState:
             {
                 'id': 'social_activity',
                 'name': 'Не закрывайся от мира',
-                'description': 'Добавь встречу с друзьями или обед',
+                'description': 'Добавь встречу с друзьями или совместный обед',
                 'reward': {'card_points': 3, 'voice_relationship': 4},
                 'difficulty': 2,
                 'check': lambda game: any(
@@ -1545,30 +1545,36 @@ class GameState:
 
         return max(self.timeline_start_hour, min(self.timeline_end_hour - 0.5, snapped_hour))
 
-    def can_place_activity_at_time(self, activity, start_time):
-        """Check if activity can be placed at given time"""
+    def can_place_activity_at_time(self, activity, start_time, ignore_activity=None):
+        """Проверка возможности размещения, игнорируя указанную активность (при переносе)"""
         end_time = start_time + activity['duration']
 
-        # Check time constraints
-        if 'time_constraint' in activity and activity['time_constraint']:
-            constraint_start, constraint_end = activity['time_constraint']
-            if start_time < constraint_start or end_time > constraint_end:
+        # Проверка временных ограничений (всегда)
+        if 'time_constraint' in activity:
+            min_t, max_t = activity['time_constraint']
+            if not (min_t <= start_time <= max_t - activity['duration'] + 0.001):
                 return False
 
-        # Check for duplicate mandatory activities
-        if activity['mandatory']:
-            for timeline_activity in self.timeline_activities:
-                if timeline_activity.activity['name'] == activity['name']:
+        # Проверка доступности по дню недели (всегда)
+        if not self.is_activity_available_today(activity):
+            return False
+
+        # Проверка конфликтов с другими активностями
+        for ta in self.timeline_activities:
+            # Игнорируем саму перетаскиваемую активность
+            if ignore_activity and ta is ignore_activity:
+                continue
+
+            if max(start_time, ta.start_time) < min(end_time, ta.end_time):
+                return False
+
+        # Проверка на дубликаты обязательных активностей (тоже игнорируем себя)
+        if activity.get('mandatory', False):
+            for ta in self.timeline_activities:
+                if ignore_activity and ta is ignore_activity:
+                    continue
+                if ta.activity['name'] == activity['name']:
                     return False
-
-        # Check conflicts with existing activities
-        for timeline_activity in self.timeline_activities:
-            existing_start = timeline_activity.start_time
-            existing_end = timeline_activity.end_time
-
-            # Check overlap
-            if not (end_time <= existing_start or start_time >= existing_end):
-                return False
 
         return True
 
@@ -2319,7 +2325,7 @@ class GameState:
                 message = "Неплохой день, хотя есть над чем поработать. Обрати внимание на управление стрессом и энергией."
                 tone = "encouraging"
             else:
-                message = "Ну что ж, хотя бы не полный провал. Хотя я предупреждал тебя о некоторых вещах, которые ты проигнорировал."
+                message = "Ну что ж, хотя бы не полный провал. А я ведь предупреждал тебя о некоторых вещах, которые ты проигнорировал."
                 tone = "neutral_critical"
         elif performance_score >= 0:
             if relationship >= 10:
@@ -2352,7 +2358,7 @@ class GameState:
         if day == 1:
             message = (
                 "Просыпайся. Эй, ты меня вообще слышишь? Не говори что ты опять все забыл... Ох... Хорошо. Это не первый и, видимо, не последний раз. "
-                "Ты даже не помнишь свой прошлый план? Какая жалость, видимо придется составить его заново. Давай быстрее - у нас мало времени. ")
+                "Ты даже не помнишь свой прошлый план? Какая жалость, придется составить его заново. Давай быстрее - у нас мало времени. ")
             tone = "neutral"
             return {
                 'message': message,
@@ -2386,7 +2392,8 @@ class GameState:
             message = (
                 "Слушай... Тебе сейчас может показаться странным - зачем я даю тебе какие-то задания? На самом деле я уже объяснял, что это "
                 "твои собственные задания - ты про них просто забыл. Но в любом случае - если тебе вдруг станет тяжело на душе или ещё "
-                "чего случиться... Можешь поговорить со мной. Я постараюсь тебя успокоить. Но ты должен понимать - у всего есть своя цена... ")
+                "чего случиться... Можешь поговорить со мной. Я постараюсь тебя успокоить и понизить стресс. Но ты должен понимать - у всего "
+                "есть своя цена... Можешь конечно и поспорить со мной. Хороший спор понизит паранойю, но... Я особо не люблю спорить.")
             tone = "neutral"
             return {
                 'message': message,
@@ -2408,7 +2415,7 @@ class GameState:
             }
         elif day == 6:
             message = (
-                "А, кстати. Ещё раз напомню, ведь ты скорее всего забыл - выкладывайся каждый день на максимум. На тридцатый день, а это через 26 дней, "
+                "А, кстати. Ещё раз напомню, ведь ты скорее всего забыл - выкладывайся каждый день на максимум. На тридцатый день, а это через 24 дней, "
                 "мы с тобой кое о чем поговорим. Чем сильнее ты подготовишься к этому дню - тем лучше. Опять же - не буду раскрывать все свои карты, "
                 "но скажу так - ты забыл слегка больше, чем думаешь.")
             tone = "neutral"
@@ -2451,7 +2458,7 @@ class GameState:
             }
         elif day == 29:
             message = (
-                "...Совсем Близко...")
+                "Скоро... Совсем скоро...")
             tone = "neutral"
             return {
                 'message': message,
